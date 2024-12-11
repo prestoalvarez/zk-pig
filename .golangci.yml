@@ -61,13 +61,9 @@ issues:
     - mock
     - deps
     - vendor
+    - pkg/ethereum/trie # skip files forked from geth
   exclude-files:
-    # skip files copied from geth
-    - pkg/ethereum/trie/encoding_test.go
-    - pkg/ethereum/trie/encoding.go
-    - pkg/ethereum/trie/hasher.go
-    - pkg/ethereum/trie/node_enc.go
-    - pkg/ethereum/trie/node.go
+    - pkg/ethereum/trie/*
 run:
   timeout: 20m
   
