@@ -13,6 +13,7 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient/gethclient"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/kkrt-labs/kakarot-controller/pkg/ethereum/rpc"
 	"github.com/kkrt-labs/kakarot-controller/pkg/jsonrpc"
 )
 
@@ -381,7 +382,7 @@ func (c *Client) SyncProgress(_ context.Context) (*geth.SyncProgress, error) {
 
 // TransactionByHash returns the transaction with the given hash.
 func (c *Client) TransactionByHash(ctx context.Context, hash gethcommon.Hash) (tx *gethtypes.Transaction, isPending bool, err error) {
-	var res *Transaction
+	var res *rpc.Transaction
 	err = c.call(ctx, &res, "eth_getTransactionByHash", hash)
 	if err != nil {
 		return nil, false, err
@@ -402,7 +403,7 @@ func (c *Client) TransactionCount(ctx context.Context, blockHash gethcommon.Hash
 
 // TransactionInBlock returns a single transaction at index in the given block.
 func (c *Client) TransactionInBlock(ctx context.Context, blockHash gethcommon.Hash, index uint) (*gethtypes.Transaction, error) {
-	var res *Transaction
+	var res *rpc.Transaction
 	err := c.call(ctx, &res, "eth_getTransactionByBlockHashAndIndex", blockHash, gethhexutil.Uint64(index))
 	if err != nil {
 		return nil, err
@@ -435,12 +436,6 @@ func (c *Client) TransactionReceipt(ctx context.Context, txHash gethcommon.Hash)
 // There is a fast-path for transactions retrieved by TransactionByHash and
 // TransactionInBlock. Getting their sender address can be done without an RPC interaction.
 func (c *Client) TransactionSender(ctx context.Context, tx *gethtypes.Transaction, block gethcommon.Hash, index uint) (gethcommon.Address, error) {
-	// Try to load the address from the cache.
-	sender, err := gethtypes.Sender(&senderFromServer{blockhash: block}, tx)
-	if err == nil {
-		return sender, nil
-	}
-
 	// It was not found in cache, ask the server.
 	var meta struct {
 		Hash gethcommon.Hash
@@ -505,7 +500,7 @@ func (c *Client) getBlock(ctx context.Context, method string, args ...interface{
 		return nil, geth.NotFound
 	}
 	// Decode header and transactions.
-	var block Block
+	var block rpc.Block
 	if err := json.Unmarshal(raw, &block); err != nil {
 		return nil, err
 	}

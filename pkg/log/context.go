@@ -7,6 +7,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// TODO: replace logrus with zap
+
 // loggerKey is the context key for the logger.
 type loggerKeyType string
 
@@ -40,11 +42,16 @@ func LoggerWithFieldsFromNamespaceContext(ctx context.Context, namespaces ...str
 		}
 	}
 
-	return LoggerFromContext(ctx).WithFields(fields)
+	return loggerFromContext(ctx).WithFields(fields)
 }
 
-// LoggerFromContext returns the logrus.FieldLogger attached to given context.
+// LoggerFromContext returns a logrus.FieldLogger from the given context with the default namespace tags attached to it
 func LoggerFromContext(ctx context.Context) logrus.FieldLogger {
+	return LoggerWithFieldsFromNamespaceContext(ctx, tag.DefaultNamespace)
+}
+
+// loggerFromContext returns the logrus.FieldLogger attached to given context.
+func loggerFromContext(ctx context.Context) logrus.FieldLogger {
 	if logger, ok := ctx.Value(loggerKey).(logrus.FieldLogger); ok {
 		return logger
 	}
