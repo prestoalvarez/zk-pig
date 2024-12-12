@@ -9,4 +9,5 @@ import (
 
 func TestReadersImplementInterface(t *testing.T) {
 	assert.Implements(t, (*gethstate.Reader)(nil), new(rpcReader))
+	assert.Implements(t, (*gethstate.Reader)(nil), new(stateAccessTrackerReader))
 }
