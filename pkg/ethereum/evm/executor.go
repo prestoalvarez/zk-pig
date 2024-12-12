@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	gethparams "github.com/ethereum/go-ethereum/params"
+	"github.com/kkrt-labs/kakarot-controller/pkg/log"
 	"github.com/kkrt-labs/kakarot-controller/src"
 )
 
@@ -51,7 +52,7 @@ func NewExecutor() Executor {
 // It processes the block on the given state and chain then validates the block if requested.
 //
 //nolint:gocritic // TODO: uncomment commented code after adding metrics
-func (e *executor) Execute(_ context.Context, params *ExecParams) (res *core.ProcessResult, execErr error) {
+func (e *executor) Execute(ctx context.Context, params *ExecParams) (res *core.ProcessResult, execErr error) {
 	if vmCfg := params.VMConfig; vmCfg != nil && vmCfg.Tracer != nil {
 		if vmCfg.Tracer.OnBlockStart != nil {
 			vmCfg.Tracer.OnBlockStart(tracing.BlockEvent{
@@ -86,6 +87,7 @@ func (e *executor) Execute(_ context.Context, params *ExecParams) (res *core.Pro
 	processor := core.NewStateProcessor(params.Chain.Config(), params.Chain)
 
 	// pstart := time.Now()
+	log.LoggerFromContext(ctx).Infof("Process block...")
 	res, execErr = processor.Process(params.Block, params.State, *params.VMConfig)
 	if execErr != nil {
 		execErr = fmt.Errorf("failed to process block: %v", execErr)
@@ -100,6 +102,7 @@ func (e *executor) Execute(_ context.Context, params *ExecParams) (res *core.Pro
 
 	if params.Validate {
 		// vstart := time.Now()
+		log.LoggerFromContext(ctx).Infof("Validate state transition...")
 		validator := core.NewBlockValidator(params.Chain.Config(), nil)
 		if execErr = validator.ValidateState(params.Block, params.State, res, false); execErr != nil {
 			execErr = fmt.Errorf("failed to validate block: %v", execErr)

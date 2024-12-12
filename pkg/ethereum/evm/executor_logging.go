@@ -56,12 +56,12 @@ func ExecutorWithLog(namespaces ...string) ExecutorDecorator {
 			// Set tracing logger
 			params.VMConfig.Tracer = NewLoggerTracer(logger).Hooks()
 
-			logger.Debug("Executing block...")
+			logger.Info("Start block execution...")
 			res, err := executor.Execute(log.WithLogger(ctx, logger), params)
 			if err != nil {
-				logger.WithError(err).Error("Failed to execute block")
+				logger.WithError(err).Error("Block execution failed")
 			} else {
-				logger.WithField("gasUsed", res.GasUsed).Debug("Executed block")
+				logger.WithField("gasUsed", res.GasUsed).Info("Block execution succeeded!")
 			}
 
 			return res, err
@@ -70,6 +70,7 @@ func ExecutorWithLog(namespaces ...string) ExecutorDecorator {
 }
 
 // LoggerTracer is an EVM tracer that logs EVM execution
+// TODO: it would be nice to have a way to configure when to log and when not to log for each method
 type LoggerTracer struct {
 	logger      logrus.FieldLogger
 	blockLogger logrus.FieldLogger
@@ -87,16 +88,10 @@ func (t *LoggerTracer) OnBlockStart(event tracing.BlockEvent) {
 		"block.number": event.Block.Number(),
 		"block.hash":   event.Block.Hash().Hex(),
 	})
-	t.blockLogger.Debug("Start executing block")
 }
 
 // OnBlockEnd logs block execution end
-func (t *LoggerTracer) OnBlockEnd(err error) {
-	if err != nil {
-		t.blockLogger.WithError(err).Error("failed to execute block")
-	} else {
-		t.blockLogger.Info("Executed block")
-	}
+func (t *LoggerTracer) OnBlockEnd(_ error) {
 	t.blockLogger = nil
 }
 
@@ -153,7 +148,7 @@ func (t *LoggerTracer) OnEnter(depth int, typ byte, from, to gethcommon.Address,
 		"msg.input": hexutil.Encode(input),
 		"msg.gas":   gas,
 		"msg.value": hexutil.EncodeBig(value),
-	}).Debug("Execute EVM message...")
+	}).Debug("Start EVM message execution...")
 }
 
 // OnExit logs EVM message execution end
@@ -164,23 +159,21 @@ func (t *LoggerTracer) OnExit(depth int, output []byte, gasUsed uint64, err erro
 		"msg.gasUsed":  gasUsed,
 		"msg.reverted": reverted,
 	})
-	if err != nil {
-		logger.WithError(err).Error("Failed to process EVM message")
-	} else {
-		logger.Debug("EVM message executed")
-	}
+
+	logger.WithError(err).Debug("End EVM message execution")
 }
 
 // OnOpcode logs opcode execution
 func (t *LoggerTracer) OnOpcode(pc uint64, op byte, gas, cost uint64, _ tracing.OpContext, _ []byte, depth int, err error) {
+	logger := t.txLogger.WithFields(logrus.Fields{
+		"pc":    pc,
+		"op":    gethvm.OpCode(op).String(),
+		"gas":   gas,
+		"cost":  cost,
+		"depth": depth,
+	})
 	if err != nil {
-		t.txLogger.WithFields(logrus.Fields{
-			"pc":    pc,
-			"op":    gethvm.OpCode(op).String(),
-			"gas":   gas,
-			"cost":  cost,
-			"depth": depth,
-		}).WithError(err).Error("Cannot execute opcode")
+		logger.WithError(err).Debug("Cannot execute opcode")
 	}
 }
 
@@ -192,7 +185,7 @@ func (t *LoggerTracer) OnFault(pc uint64, op byte, gas, cost uint64, _ tracing.O
 		"gas":   gas,
 		"cost":  cost,
 		"depth": depth,
-	}).WithError(err).Error("Failed to execute opcode")
+	}).WithError(err).Debug("Failed to execute opcode")
 }
 
 // Hooks returns the logger tracer hooks
