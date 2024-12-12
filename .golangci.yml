@@ -63,7 +63,7 @@ issues:
     - vendor
     - pkg/ethereum/trie # skip files forked from geth
   exclude-files:
-    - pkg/ethereum/trie/*
+    - pkg/ethereum/state/database_modified_trie.go
 run:
   timeout: 20m
   
