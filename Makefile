@@ -1,3 +1,10 @@
+# Git based version
+VERSION ?= $(shell git describe --tags)
+
+# Veriables used for building with goreleaser
+GOLANG_VERSION ?= v1.22.0
+MODULE_NAME := github.com/kkrt-labs/kakarot-controller
+
 GOPATH ?= $(shell go env GOPATH)
 
 # List of effective go files
@@ -5,9 +12,6 @@ GOFILES := $(shell find . -name '*.go' -not -path "./vendor/*" -not -path "./tes
 
 # List of packages except testsutils
 PACKAGES ?= $(shell go list ./... | egrep -v "testutils" )
-
-# Git based version
-VERSION ?= $(shell git describe --tags)
 
 # Build folder
 BUILD_FOLDER = build
@@ -24,20 +28,23 @@ COVERAGE_BUILD_FOLDER = $(BUILD_FOLDER)/coverage
 UNIT_COVERAGE_OUT  = $(COVERAGE_BUILD_FOLDER)/ut_cov.out
 UNIT_COVERAGE_HTML = $(COVERAGE_BUILD_FOLDER)/ut_index.html
 
-.PHONY: help mod-tidy test test-race test-lint lint mockgen-install version
+.PHONY: help mod-tidy test test-race test-lint lint generate-mocks goreleaser-snaptho goreleaser version
 
 help:
 	@echo "Usage: make <target>"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  help               Show Makefile help message"
-	@echo "  mod-tidy           Run go mod tidy command to update go.mod and go.sum files"
-	@echo "  test               Run unit tests with coverage"
-	@echo "  test-race          Run unit tests with race detector" 
-	@echo "  test-lint          Check linting"
-	@echo "  lint               Run linter to fix linting issues"
-	@echo "  mockgen-install    Install mockgen command"
-	@echo "  version            Read version from git tags"
+	@echo "  help                Show Makefile help message"
+	@echo "  mod-tidy            Run go mod tidy command to update go.mod and go.sum files"
+	@echo "  test                Run unit tests with coverage"
+	@echo "  test-race           Run unit tests with race detector" 
+	@echo "  test-lint           Check linting"
+	@echo "  lint                Run linter to fix linting issues"
+	@echo "  mockgen-install     Install mockgen command"
+	@echo "  generate-mocks      Generate mocks"
+	@echo "  goreleaser-snapshot Execute goreleaser with --snapshot flag"
+	@echo "  goreleaser          Execute goreleaser"
+	@echo "  version             Read version from git tags"
 
 # Run go mod tidy command to update go.mod and go.sum files
 mod-tidy:
@@ -78,6 +85,33 @@ mockgen-install:
 		echo "Installing mockgen..."; \
 		go install go.uber.org/mock/mockgen@$(MOCKGEN_VERSION);  \
 	}
+
+generate-mocks: mockgen-install
+	@go generate ./...
+
+goreleaser-snapshot:
+	@docker run \
+		--rm \
+		--privileged \
+		-e CGO_ENABLED=1 \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v `pwd`:/go/src/$(MODULE_NAME) \
+		-v `pwd`/sysroot:/sysroot \
+		-w /go/src/$(MODULE_NAME) \
+		goreleaser/goreleaser-cross:${GOLANG_VERSION} \
+		--clean --skip=publish,validate --snapshot
+
+goreleaser:
+	@docker run \
+		--rm \
+		--privileged \
+		-e CGO_ENABLED=1 \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v `pwd`:/go/src/$(MODULE_NAME) \
+		-v `pwd`/sysroot:/sysroot \
+		-w /go/src/$(MODULE_NAME) \
+		goreleaser/goreleaser-cross:${GOLANG_VERSION} \
+		--clean --skip=publish,validate
 
 # Read version from git tags
 # It is used in CI to set the version
