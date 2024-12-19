@@ -4,56 +4,46 @@ import (
 	"context"
 
 	"github.com/kkrt-labs/kakarot-controller/pkg/tag"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
-// TODO: replace logrus with zap
+type loggerKey struct{}
 
-// loggerKey is the context key for the logger.
-type loggerKeyType string
-
-var (
-	loggerKey loggerKeyType = "logger"
-)
-
-// WithLogger returns a new context with the given logger attached to it
-func WithLogger(ctx context.Context, logger logrus.FieldLogger) context.Context {
-	return context.WithValue(ctx, loggerKey, logger)
-}
-
-// LoggerFromContext returns a logrus.FieldLogger from the given context with the default namespace tags attached to it
-func LoggerWithFieldsFromContext(ctx context.Context) logrus.FieldLogger {
+// LoggerWithFieldsFromContext returns a logger from the given context with the default namespace tags attached to it
+func LoggerWithFieldsFromContext(ctx context.Context) *zap.Logger {
 	return LoggerWithFieldsFromNamespaceContext(ctx, tag.DefaultNamespace)
 }
 
-// LoggerFromContext returns a logrus.FieldLogger from the given context.
+// LoggerWithFieldsFromNamespaceContext returns a logger from the given context.
 // It loads the tags from the provided tags namespace and adds them to the logger.
-func LoggerWithFieldsFromNamespaceContext(ctx context.Context, namespaces ...string) logrus.FieldLogger {
-	fields := logrus.Fields{}
-
+func LoggerWithFieldsFromNamespaceContext(ctx context.Context, namespaces ...string) *zap.Logger {
 	if len(namespaces) == 0 {
 		namespaces = []string{tag.DefaultNamespace}
 	}
 
+	logger := loggerFromContext(ctx)
 	for _, namespace := range namespaces {
-		set := tag.FromNamespaceContext(ctx, namespace)
-		for _, tag := range set {
-			fields[string(tag.Key)] = tag.Value.Interface
-		}
+		tags := tag.FromNamespaceContext(ctx, namespace)
+		fields := TagsToFields(tags)
+		logger = logger.With(fields...)
 	}
-
-	return loggerFromContext(ctx).WithFields(fields)
+	return logger
 }
 
-// LoggerFromContext returns a logrus.FieldLogger from the given context with the default namespace tags attached to it
-func LoggerFromContext(ctx context.Context) logrus.FieldLogger {
+// LoggerFromContext returns a logger from the given context with the default namespace tags attached to it
+func LoggerFromContext(ctx context.Context) *zap.Logger {
 	return LoggerWithFieldsFromNamespaceContext(ctx, tag.DefaultNamespace)
 }
 
-// loggerFromContext returns the logrus.FieldLogger attached to given context.
-func loggerFromContext(ctx context.Context) logrus.FieldLogger {
-	if logger, ok := ctx.Value(loggerKey).(logrus.FieldLogger); ok {
+// loggerFromContext returns the logger attached to given context
+func loggerFromContext(ctx context.Context) *zap.Logger {
+	if logger, ok := ctx.Value(loggerKey{}).(*zap.Logger); ok {
 		return logger
 	}
-	return logrus.StandardLogger()
+	return zap.L()
+}
+
+// WithLogger returns a new context with the given logger attached to it
+func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
+	return context.WithValue(ctx, loggerKey{}, logger)
 }

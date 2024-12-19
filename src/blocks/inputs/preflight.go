@@ -21,6 +21,7 @@ import (
 	"github.com/kkrt-labs/kakarot-controller/pkg/ethereum/trie"
 	"github.com/kkrt-labs/kakarot-controller/pkg/log"
 	"github.com/kkrt-labs/kakarot-controller/pkg/tag"
+	"go.uber.org/zap"
 )
 
 // Preflight is the interface for the preflight block execution which consists of processing an EVM block without final state validation.
@@ -48,7 +49,7 @@ func (pf *preflight) Preflight(ctx context.Context, blockNumber *big.Int) (*Heav
 	ctx = tag.WithComponent(ctx, "preflight")
 	chainCfg, block, err := pf.init(ctx, blockNumber)
 	if err != nil {
-		log.LoggerFromContext(ctx).WithError(err).Errorf("Failed to initialize preflight")
+		log.LoggerFromContext(ctx).Error("Failed to initialize preflight", zap.Error(err))
 		return nil, fmt.Errorf("failed to initialize preflight: %v", err)
 	}
 
@@ -63,15 +64,15 @@ func (pf *preflight) Preflight(ctx context.Context, blockNumber *big.Int) (*Heav
 	// Execute preflight
 	data, err := pf.preflight(ctx, chainCfg, block)
 	if err != nil {
-		log.LoggerFromContext(ctx).WithError(err).Errorf("Preflight failed")
+		log.LoggerFromContext(ctx).Error("Preflight failed", zap.Error(err))
 		return nil, fmt.Errorf("preflight failed: %v", err)
 	}
-	log.LoggerFromContext(ctx).Infof("Preflight successful")
+	log.LoggerFromContext(ctx).Info("Preflight successful")
 	return data, nil
 }
 
 func (pf *preflight) init(ctx context.Context, blockNumber *big.Int) (*params.ChainConfig, *gethtypes.Block, error) {
-	log.LoggerFromContext(ctx).Infof("Initialize preflight...")
+	log.LoggerFromContext(ctx).Info("Initialize preflight...")
 	chainID, err := pf.remote.ChainID(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch chain ID: %v", err)
@@ -100,7 +101,7 @@ type preflightContext struct {
 }
 
 func (pf *preflight) preflight(ctx context.Context, chainCfg *params.ChainConfig, block *gethtypes.Block) (*HeavyProverInputs, error) {
-	log.LoggerFromContext(ctx).Infof("Process preflight...")
+	log.LoggerFromContext(ctx).Info("Process preflight...")
 
 	genCtx, err := pf.prepareContext(ctx, chainCfg)
 	if err != nil {
@@ -204,7 +205,7 @@ func (pf *preflight) prepareProcessBlockExecParams(ctx *preflightContext, block 
 
 // execute runs the actual block EVM execution
 func (pf *preflight) execute(ctx *preflightContext, execParams *evm.ExecParams) error {
-	log.LoggerFromContext(ctx.ctx).Infof("Execute EVM... (this may take a while)")
+	log.LoggerFromContext(ctx.ctx).Info("Execute EVM... (this may take a while)")
 	_, err := evm.ExecutorWithTags("evm")(evm.ExecutorWithLog()(evm.NewExecutor())).Execute(ctx.ctx, execParams)
 	if err != nil {
 		return fmt.Errorf("failed to execute block: %v", err)
@@ -216,7 +217,7 @@ func (pf *preflight) execute(ctx *preflightContext, execParams *evm.ExecParams) 
 // fetchStateProofs for all accounts and storage slots that were accessed during the block execution
 // It fetches the state proofs both at the initial state (parent state) and at the final state
 func (pf *preflight) fetchStateProofs(ctx *preflightContext, execParams *evm.ExecParams) (preStateProofs, postStateProofs []*trie.AccountProof, err error) {
-	log.LoggerFromContext(ctx.ctx).Infof("Fetch state proofs after successful EVM execution... (this may take a while)")
+	log.LoggerFromContext(ctx.ctx).Info("Fetch state proofs after successful EVM execution... (this may take a while)")
 
 	finalState := execParams.State
 	tracker := ctx.trackers.GetAccessTracker(ctx.parentHeader.Root)

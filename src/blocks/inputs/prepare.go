@@ -19,6 +19,7 @@ import (
 	"github.com/kkrt-labs/kakarot-controller/pkg/ethereum/trie"
 	"github.com/kkrt-labs/kakarot-controller/pkg/log"
 	"github.com/kkrt-labs/kakarot-controller/pkg/tag"
+	"go.uber.org/zap"
 )
 
 // Preparer is the interface for preparing the prover inputs that serves as the input for the EVM prover engine.
@@ -48,10 +49,10 @@ func (p *preparer) Prepare(ctx context.Context, data *HeavyProverInputs) (*Prove
 
 	inputs, err := p.prepare(ctx, data)
 	if err != nil {
-		log.LoggerFromContext(ctx).WithError(err).Errorf("Provable inputs preparation failed")
+		log.LoggerFromContext(ctx).Error("Provable inputs preparation failed", zap.Error(err))
 		return nil, err
 	}
-	log.LoggerFromContext(ctx).Infof("Provable inputs preparation succeeded")
+	log.LoggerFromContext(ctx).Info("Provable inputs preparation succeeded")
 
 	return inputs, nil
 }
@@ -64,7 +65,7 @@ type preparerContext struct {
 }
 
 func (p *preparer) prepare(ctx context.Context, inputs *HeavyProverInputs) (*ProverInputs, error) {
-	log.LoggerFromContext(ctx).Infof("Process provable inputs preparation...")
+	log.LoggerFromContext(ctx).Info("Process provable inputs preparation...")
 
 	valCtx, err := p.prepareContext(ctx, inputs)
 	if err != nil {
@@ -160,7 +161,7 @@ func (p *preparer) prepareExecParams(ctx *preparerContext, inputs *HeavyProverIn
 }
 
 func (p *preparer) execute(ctx *preparerContext, execParams *evm.ExecParams) error {
-	log.LoggerFromContext(ctx.ctx).Infof("Execute EVM...")
+	log.LoggerFromContext(ctx.ctx).Info("Execute EVM...")
 	_, err := evm.ExecutorWithTags("evm")(evm.ExecutorWithLog()(evm.NewExecutor())).Execute(ctx.ctx, execParams)
 	if err != nil {
 		return fmt.Errorf("failed to execute block: %v", err)
