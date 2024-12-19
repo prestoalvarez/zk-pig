@@ -13,9 +13,34 @@ import (
 )
 
 func main() {
-	// TODO: configure dev/prod environments to use zap.NewProduction() in production
-	// and zap.NewDevelopment() in dev. We can also modify log levels (debug, info, etc.)
-	logger, _ := zap.NewDevelopment(zap.IncreaseLevel(zap.InfoLevel))
+	var logger *zap.Logger
+	var err error
+	env := os.Getenv("ENV")
+
+	switch env {
+	case "dev":
+		logger, err = zap.NewDevelopment()
+	case "prod":
+		logger, err = zap.NewProduction()
+	default:
+		logger, err = zap.NewDevelopment()
+	}
+	if err != nil {
+		fmt.Printf("Failed to create logger: %v\n", err)
+		os.Exit(1)
+	}
+
+	level := os.Getenv("LOGGER_LEVEL")
+
+	switch level {
+	case "debug":
+		logger = logger.WithOptions(zap.IncreaseLevel(zap.DebugLevel))
+	case "info":
+		logger = logger.WithOptions(zap.IncreaseLevel(zap.InfoLevel))
+	default:
+		logger = logger.WithOptions(zap.IncreaseLevel(zap.InfoLevel))
+	}
+	zap.ReplaceGlobals(logger)
 	defer func() {
 		if err := logger.Sync(); err != nil {
 			fmt.Printf("Failed to sync logger: %v\n", err)
@@ -26,10 +51,10 @@ func main() {
 		RPC: &jsonrpchttp.Config{Address: os.Getenv("RPC_URL")},
 	}
 
-	logger.Info("Version: %s", zap.String("version", src.Version))
+	logger.Info("Version", zap.String("version", src.Version))
 
 	svc := blocks.New(cfg)
-	err := svc.Generate(context.Background(), ethrpc.MustFromBlockNumArg("latest"))
+	err = svc.Generate(context.Background(), ethrpc.MustFromBlockNumArg("latest"))
 	if err != nil {
 		logger.Fatal("Failed to generate block inputs", zap.Error(err))
 	}
