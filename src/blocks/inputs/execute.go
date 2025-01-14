@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	gethstate "github.com/ethereum/go-ethereum/core/state"
@@ -69,10 +68,7 @@ func (e *executor) execute(ctx context.Context, inputs *ProverInputs) (*core.Pro
 		return nil, fmt.Errorf("failed to prepare execution context: %v", err)
 	}
 
-	err = e.preparePreState(execCtx, inputs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare pre-state: %v", err)
-	}
+	e.preparePreState(execCtx, inputs)
 
 	execParams, err := e.prepareExecParams(execCtx, inputs)
 	if err != nil {
@@ -102,7 +98,7 @@ func (e *executor) prepareContext(ctx context.Context, inputs *ProverInputs) (*e
 	}, nil
 }
 
-func (e *executor) preparePreState(ctx *executorContext, inputs *ProverInputs) error {
+func (e *executor) preparePreState(ctx *executorContext, inputs *ProverInputs) {
 	log.LoggerFromContext(ctx.ctx).Info("Prepare pre-state...")
 
 	// -- Preload the ancestors of the block into database ---
@@ -118,15 +114,9 @@ func (e *executor) preparePreState(ctx *executorContext, inputs *ProverInputs) e
 	// -- Preload the pre-state nodes to database ---
 	nodes := make([][]byte, 0)
 	for _, node := range inputs.PreState {
-		b, err := hexutil.Decode(node)
-		if err != nil {
-			return fmt.Errorf("failed to decode node %v: %v", node, err)
-		}
-		nodes = append(nodes, b)
+		nodes = append(nodes, node)
 	}
 	ethereum.WriteNodesToHashDB(ctx.stateDB.TrieDB().Disk(), nodes...)
-
-	return nil
 }
 
 func (e *executor) prepareExecParams(ctx *executorContext, inputs *ProverInputs) (*evm.ExecParams, error) {
