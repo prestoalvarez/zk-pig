@@ -12,10 +12,12 @@ import (
 	"github.com/kkrt-labs/kakarot-controller/pkg/ethereum/rpc/jsonrpc"
 	jsonrpchttp "github.com/kkrt-labs/kakarot-controller/pkg/jsonrpc/http"
 	"github.com/kkrt-labs/kakarot-controller/src/blocks"
+	blockstore "github.com/kkrt-labs/kakarot-controller/src/blocks/store"
 )
 
 const (
 	blockNumberFlag = "block-number"
+	formatFlag      = "format"
 )
 
 // 1. Main command
@@ -46,6 +48,7 @@ func NewGenerateCommand() *cobra.Command {
 		rpcURL      string
 		dataDir     string
 		blockNumber string
+		formatStr   string
 	)
 
 	cmd := &cobra.Command{
@@ -58,13 +61,18 @@ func NewGenerateCommand() *cobra.Command {
 				RPC:     &jsonrpchttp.Config{Address: rpcURL},
 			}
 
-			blockNum, err := parseBigInt(blockNumber, "block-number")
+			blockNum, err := parseBigInt(blockNumber, blockNumberFlag)
 			if err != nil {
 				zap.L().Fatal("Failed to parse block number", zap.Error(err))
 			}
 
+			format, err := parseFormat(formatStr)
+			if err != nil {
+				zap.L().Fatal("Failed to parse format", zap.Error(err))
+			}
+
 			svc := blocks.New(cfg)
-			if err := svc.Generate(context.Background(), blockNum); err != nil {
+			if err := svc.Generate(context.Background(), blockNum, format); err != nil {
 				zap.L().Fatal("Failed to generate prover inputs", zap.Error(err))
 			}
 			zap.L().Info("Prover inputs generated")
@@ -72,6 +80,7 @@ func NewGenerateCommand() *cobra.Command {
 	}
 
 	addCommonFlags(cmd, &rpcURL, &dataDir, &blockNumber)
+	AddFormatFlag(cmd, &formatStr)
 	_ = cmd.MarkFlagRequired("rpc-url")
 
 	return cmd
@@ -119,6 +128,7 @@ func NewPrepareCommand() *cobra.Command {
 		dataDir     string
 		blockNumber string
 		chainID     string
+		formatStr   string
 	)
 
 	cmd := &cobra.Command{
@@ -140,8 +150,13 @@ func NewPrepareCommand() *cobra.Command {
 				zap.L().Fatal("Failed to parse chain-id", zap.Error(err))
 			}
 
+			format, err := parseFormat(formatStr)
+			if err != nil {
+				zap.L().Fatal("Failed to parse format", zap.Error(err))
+			}
+
 			svc := blocks.New(cfg)
-			if err := svc.Prepare(context.Background(), chainIDBig, blockNum); err != nil {
+			if err := svc.Prepare(context.Background(), chainIDBig, blockNum, format); err != nil {
 				zap.L().Fatal("Failed to prepare prover inputs", zap.Error(err))
 			}
 			zap.L().Info("Prover inputs prepared")
@@ -149,6 +164,7 @@ func NewPrepareCommand() *cobra.Command {
 	}
 
 	addCommonFlags(cmd, &rpcURL, &dataDir, &blockNumber)
+	AddFormatFlag(cmd, &formatStr)
 	cmd.Flags().StringVar(&chainID, "chain-id", "", "Chain ID (decimal)")
 	_ = cmd.MarkFlagRequired("chain-id")
 
@@ -161,6 +177,7 @@ func NewExecuteCommand() *cobra.Command {
 		dataDir     string
 		blockNumber string
 		chainID     string
+		formatStr   string
 	)
 
 	cmd := &cobra.Command{
@@ -182,8 +199,13 @@ func NewExecuteCommand() *cobra.Command {
 				zap.L().Fatal("Failed to parse chain-id", zap.Error(err))
 			}
 
+			format, err := parseFormat(formatStr)
+			if err != nil {
+				zap.L().Fatal("Failed to parse format", zap.Error(err))
+			}
+
 			svc := blocks.New(cfg)
-			if err := svc.Execute(context.Background(), chainIDBig, blockNum); err != nil {
+			if err := svc.Execute(context.Background(), chainIDBig, blockNum, format); err != nil {
 				zap.L().Fatal("Execute failed", zap.Error(err))
 			}
 			zap.L().Info("Execute succeeded")
@@ -191,6 +213,7 @@ func NewExecuteCommand() *cobra.Command {
 	}
 
 	addCommonFlags(cmd, &rpcURL, &dataDir, &blockNumber)
+	AddFormatFlag(cmd, &formatStr)
 	cmd.Flags().StringVar(&chainID, "chain-id", "", "Chain ID (decimal)")
 	_ = cmd.MarkFlagRequired("chain-id")
 
@@ -232,6 +255,10 @@ func AddChainIDFlag(chainID *string, f *pflag.FlagSet) string {
 	return flagName
 }
 
+func AddFormatFlag(cmd *cobra.Command, format *string) {
+	cmd.Flags().StringVar(format, formatFlag, "json", "Output format (json or protobuf)")
+}
+
 func parseBigInt(val, flagName string) (*big.Int, error) {
 	if val == "" {
 		return nil, fmt.Errorf("missing required flag: %s", flagName)
@@ -252,4 +279,13 @@ func parseBigInt(val, flagName string) (*big.Int, error) {
 		return nil, fmt.Errorf("invalid integer value %q for flag %s", val, flagName)
 	}
 	return bn, nil
+}
+
+func parseFormat(formatStr string) (blockstore.Format, error) {
+	if formatStr == "" || formatStr == "json" {
+		return blockstore.JSONFormat, nil
+	} else if formatStr == "protobuf" {
+		return blockstore.ProtobufFormat, nil
+	}
+	return 0, fmt.Errorf("invalid format %q", formatStr)
 }
