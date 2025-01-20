@@ -9,6 +9,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/kkrt-labs/kakarot-controller/pkg/jsonrpc"
 	comhttp "github.com/kkrt-labs/kakarot-controller/pkg/net/http"
+	comurl "github.com/kkrt-labs/kakarot-controller/pkg/net/url"
 )
 
 // Client allows to connect to a JSON-RPC server
@@ -26,7 +27,16 @@ func NewClientFromClient(s autorest.Sender) *Client {
 }
 
 // NewClient creates a new client capable of connecting to a JSON-RPC server
-func NewClient(cfg *Config) (*Client, error) {
+func NewClient(addr string, cfg *Config) (*Client, error) {
+	u, err := comurl.Parse(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported scheme for websocket connection: %s", u.Scheme)
+	}
+
 	httpc, err := comhttp.NewClient(cfg.HTTP)
 	if err != nil {
 		return nil, err
@@ -35,7 +45,7 @@ func NewClient(cfg *Config) (*Client, error) {
 	return NewClientFromClient(
 		autorest.Client{
 			Sender:           httpc,
-			RequestInspector: comhttp.WithBaseURL(cfg.Address),
+			RequestInspector: comhttp.WithBaseURL(u),
 		},
 	), nil
 }
@@ -82,42 +92,8 @@ func newRequest(ctx context.Context) *http.Request {
 	return req
 }
 
-// responseMsg is a struct allowing to encode/decode a JSON-RPC response body
-type responseMsg struct {
-	Version string           `json:"jsonrpc"`
-	Result  *json.RawMessage `json:"result,omitempty"`
-	Error   *json.RawMessage `json:"error,omitempty"`
-	ID      *json.RawMessage `json:"id,omitempty"`
-}
-
-func inspectCallResponseMsg(msg *responseMsg, res interface{}) error {
-	if msg.Error == nil && msg.Result == nil {
-		return fmt.Errorf("invalid JSON-RPC response missing both result and error")
-	}
-
-	if msg.Error != nil {
-		errMsg := new(jsonrpc.ErrorMsg)
-		err := json.Unmarshal(*msg.Error, errMsg)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal JSON-RPC error message %v", string(*msg.Error))
-		}
-		return errMsg
-	}
-
-	if msg.Result != nil && res != nil {
-		err := json.Unmarshal(*msg.Result, res)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal JSON-RPC result %v into %T (%v)", string(*msg.Result), res, err)
-		}
-		return nil
-	}
-
-	return nil
-
-}
-
 func inspectCallResponse(resp *http.Response, res interface{}) error {
-	msg := new(responseMsg)
+	msg := new(jsonrpc.ResponseMsg)
 	err := autorest.Respond(
 		resp,
 		autorest.WithErrorUnlessOK(),
@@ -128,5 +104,5 @@ func inspectCallResponse(resp *http.Response, res interface{}) error {
 		return err
 	}
 
-	return inspectCallResponseMsg(msg, res)
+	return msg.Unmarshal(res)
 }
