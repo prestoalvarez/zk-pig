@@ -6,8 +6,11 @@ toolchain go1.22.9
 
 require (
 	github.com/Azure/go-autorest/autorest v0.11.30
+	github.com/aws/aws-sdk-go-v2 v1.33.0
+	github.com/aws/aws-sdk-go-v2/config v1.29.1
+	github.com/aws/aws-sdk-go-v2/credentials v1.17.54
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.73.2
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/ethereum/go-ethereum v1.14.12
 	github.com/gorilla/websocket v1.5.0
 	github.com/holiman/uint256 v1.3.2
@@ -17,7 +20,6 @@ require (
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.32.0
 	golang.org/x/net v0.34.0
 	google.golang.org/protobuf v1.36.4
 	gopkg.in/h2non/gock.v1 v1.1.2
@@ -31,12 +33,27 @@ require (
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect
+	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.7 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.24 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.28 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.28 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.1 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.28 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.5.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.9 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.9 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.24.11 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.10 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.33.9 // indirect
+	github.com/aws/smithy-go v1.22.1 // indirect
 	github.com/bits-and-blooms/bitset v1.13.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.12.1 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20240223125850-b1e8a79f509c // indirect
 	github.com/crate-crypto/go-kzg-4844 v1.0.0 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
@@ -76,6 +93,7 @@ require (
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
+	golang.org/x/crypto v0.32.0 // indirect
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect

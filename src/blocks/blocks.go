@@ -11,22 +11,22 @@ import (
 	ethjsonrpc "github.com/kkrt-labs/kakarot-controller/pkg/ethereum/rpc/jsonrpc"
 	"github.com/kkrt-labs/kakarot-controller/pkg/jsonrpc"
 	jsonrpcmrgd "github.com/kkrt-labs/kakarot-controller/pkg/jsonrpc/merged"
+	compressstore "github.com/kkrt-labs/kakarot-controller/pkg/store/compress"
 	"github.com/kkrt-labs/kakarot-controller/pkg/svc"
 	blockinputs "github.com/kkrt-labs/kakarot-controller/src/blocks/inputs"
 	blockstore "github.com/kkrt-labs/kakarot-controller/src/blocks/store"
-	filestore "github.com/kkrt-labs/kakarot-controller/src/blocks/store/file"
 )
 
 // Service is a service that enables the generation of prover inpunts for EVM compatible blocks.
 type Service struct {
-	cfg   *Config
-	store blockstore.BlockStore
-
-	initOnce sync.Once
-	remote   jsonrpc.Client
-	ethrpc   ethrpc.Client
-	chainID  *big.Int
-	err      error
+	cfg                    *Config
+	heavyProverInputsStore blockstore.HeavyProverInputsStore
+	proverInputsStore      blockstore.ProverInputsStore
+	initOnce               sync.Once
+	remote                 jsonrpc.Client
+	ethrpc                 ethrpc.Client
+	chainID                *big.Int
+	err                    error
 }
 
 // New creates a new Service.
@@ -34,8 +34,7 @@ func New(cfg *Config) (*Service, error) {
 	cfg = cfg.SetDefault()
 
 	s := &Service{
-		cfg:   cfg,
-		store: filestore.New(cfg.BaseDir),
+		cfg: cfg,
 	}
 
 	if cfg.Chain.RPC != nil {
@@ -55,6 +54,24 @@ func New(cfg *Config) (*Service, error) {
 
 		s.ethrpc = ethjsonrpc.NewFromClient(remote)
 	}
+
+	heavyProverInputsStore, err := blockstore.NewHeavyProverInputsStore(&cfg.HeavyProverInputsStoreConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create heavy prover inputs store: %v", err)
+	}
+
+	compressStore, err := compressstore.New(compressstore.Config{
+		MultiStoreConfig: cfg.ProverInputsStoreConfig.MultiStoreConfig,
+		ContentEncoding:  cfg.ProverInputsStoreConfig.ContentEncoding,
+	})
+
+	proverInputsStore := blockstore.NewFromStore(compressStore, cfg.ProverInputsStoreConfig.ContentType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create prover inputs store: %v", err)
+	}
+
+	s.heavyProverInputsStore = heavyProverInputsStore
+	s.proverInputsStore = proverInputsStore
 
 	return s, nil
 }
@@ -88,17 +105,25 @@ func (s *Service) Start(ctx context.Context) error {
 	return s.err
 }
 
-func (s *Service) Generate(ctx context.Context, blockNumber *big.Int, format blockstore.Format, compression blockstore.Compression) error {
+func (s *Service) Generate(ctx context.Context, blockNumber *big.Int) error {
 	data, err := s.preflight(ctx, blockNumber)
 	if err != nil {
 		return err
 	}
 
-	if err := s.prepare(ctx, data.Block.Number.ToInt(), format, compression); err != nil {
+	if s.chainID == nil {
+		return fmt.Errorf("chain ID missing")
+	}
+	_, err = s.preflight(ctx, data.Block.Number.ToInt())
+	if err != nil {
 		return err
 	}
 
-	if err := s.execute(ctx, data.Block.Number.ToInt(), format, compression); err != nil {
+	if err := s.prepare(ctx, data.Block.Number.ToInt()); err != nil {
+		return err
+	}
+
+	if err := s.execute(ctx, data.Block.Number.ToInt()); err != nil {
 		return err
 	}
 
@@ -119,22 +144,22 @@ func (s *Service) preflight(ctx context.Context, blockNumber *big.Int) (*blockin
 		return nil, fmt.Errorf("failed to execute preflight: %v", err)
 	}
 
-	if err = s.store.StoreHeavyProverInputs(ctx, data); err != nil {
+	if err = s.heavyProverInputsStore.StoreHeavyProverInputs(ctx, data); err != nil {
 		return nil, fmt.Errorf("failed to store preflight data: %v", err)
 	}
 
 	return data, nil
 }
 
-func (s *Service) Prepare(ctx context.Context, blockNumber *big.Int, format blockstore.Format, compression blockstore.Compression) error {
+func (s *Service) Prepare(ctx context.Context, blockNumber *big.Int) error {
 	if s.chainID == nil {
 		return fmt.Errorf("chain ID missing")
 	}
-	return s.prepare(ctx, blockNumber, format, compression)
+	return s.prepare(ctx, blockNumber)
 }
 
-func (s *Service) prepare(ctx context.Context, blockNumber *big.Int, format blockstore.Format, compression blockstore.Compression) error {
-	data, err := s.store.LoadHeavyProverInputs(ctx, s.chainID.Uint64(), blockNumber.Uint64())
+func (s *Service) prepare(ctx context.Context, blockNumber *big.Int) error {
+	data, err := s.heavyProverInputsStore.LoadHeavyProverInputs(ctx, s.chainID.Uint64(), blockNumber.Uint64())
 	if err != nil {
 		return fmt.Errorf("failed to load preflight data: %v", err)
 	}
@@ -144,7 +169,7 @@ func (s *Service) prepare(ctx context.Context, blockNumber *big.Int, format bloc
 		return fmt.Errorf("failed to prepare provable inputs: %v", err)
 	}
 
-	err = s.store.StoreProverInputs(ctx, inputs, format, compression)
+	err = s.proverInputsStore.StoreProverInputs(ctx, inputs)
 	if err != nil {
 		return fmt.Errorf("failed to store provable inputs: %v", err)
 	}
@@ -152,16 +177,16 @@ func (s *Service) prepare(ctx context.Context, blockNumber *big.Int, format bloc
 	return nil
 }
 
-func (s *Service) Execute(ctx context.Context, blockNumber *big.Int, format blockstore.Format, compression blockstore.Compression) error {
+func (s *Service) Execute(ctx context.Context, blockNumber *big.Int) error {
 	if s.chainID == nil {
 		return fmt.Errorf("chain ID missing")
 	}
 
-	return s.execute(ctx, blockNumber, format, compression)
+	return s.execute(ctx, blockNumber)
 }
 
-func (s *Service) execute(ctx context.Context, blockNumber *big.Int, format blockstore.Format, compression blockstore.Compression) error {
-	inputs, err := s.store.LoadProverInputs(ctx, s.chainID.Uint64(), blockNumber.Uint64(), format, compression)
+func (s *Service) execute(ctx context.Context, blockNumber *big.Int) error {
+	inputs, err := s.proverInputsStore.LoadProverInputs(ctx, s.chainID.Uint64(), blockNumber.Uint64())
 	if err != nil {
 		return fmt.Errorf("failed to load provable inputs: %v", err)
 	}
