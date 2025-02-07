@@ -7,18 +7,17 @@ import (
 	"math/big"
 	"testing"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/stretchr/testify/assert"
-
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/kkrt-labs/kakarot-controller/pkg/ethereum/rpc"
-	storeinputs "github.com/kkrt-labs/kakarot-controller/pkg/store"
-	compressstore "github.com/kkrt-labs/kakarot-controller/pkg/store/compress"
-	filestore "github.com/kkrt-labs/kakarot-controller/pkg/store/file"
-	multistore "github.com/kkrt-labs/kakarot-controller/pkg/store/multi"
-	s3store "github.com/kkrt-labs/kakarot-controller/pkg/store/s3"
+	"github.com/kkrt-labs/go-utils/ethereum/rpc"
+	storeinputs "github.com/kkrt-labs/go-utils/store"
+	compressstore "github.com/kkrt-labs/go-utils/store/compress"
+	filestore "github.com/kkrt-labs/go-utils/store/file"
+	multistore "github.com/kkrt-labs/go-utils/store/multi"
+	s3store "github.com/kkrt-labs/go-utils/store/s3"
 	blockinputs "github.com/kkrt-labs/kakarot-controller/src/blocks/inputs"
+	"github.com/stretchr/testify/assert"
 )
 
 // Common test structures and helpers

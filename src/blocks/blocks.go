@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	ethrpc "github.com/kkrt-labs/kakarot-controller/pkg/ethereum/rpc"
-	ethjsonrpc "github.com/kkrt-labs/kakarot-controller/pkg/ethereum/rpc/jsonrpc"
-	"github.com/kkrt-labs/kakarot-controller/pkg/jsonrpc"
-	jsonrpcmrgd "github.com/kkrt-labs/kakarot-controller/pkg/jsonrpc/merged"
-	compressstore "github.com/kkrt-labs/kakarot-controller/pkg/store/compress"
-	"github.com/kkrt-labs/kakarot-controller/pkg/svc"
+	ethrpc "github.com/kkrt-labs/go-utils/ethereum/rpc"
+	ethjsonrpc "github.com/kkrt-labs/go-utils/ethereum/rpc/jsonrpc"
+	"github.com/kkrt-labs/go-utils/jsonrpc"
+	jsonrpcmrgd "github.com/kkrt-labs/go-utils/jsonrpc/merged"
+	compressstore "github.com/kkrt-labs/go-utils/store/compress"
+	"github.com/kkrt-labs/go-utils/svc"
 	blockinputs "github.com/kkrt-labs/kakarot-controller/src/blocks/inputs"
 	blockstore "github.com/kkrt-labs/kakarot-controller/src/blocks/store"
 )
