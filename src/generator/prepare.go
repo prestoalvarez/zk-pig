@@ -4,15 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	gethstate "github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/triedb"
 	"github.com/ethereum/go-ethereum/triedb/hashdb"
-	ethrpc "github.com/kkrt-labs/go-utils/ethereum/rpc"
 	"github.com/kkrt-labs/go-utils/log"
 	"github.com/kkrt-labs/go-utils/tag"
 	"github.com/kkrt-labs/zk-pig/src/ethereum"
@@ -28,7 +25,7 @@ import (
 // It bases on the preflight data collected during preflight to prepare the final prover inputs
 type Preparer interface {
 	// Prepare prepares the ProvableBlockInputs data for the EVM prover engine.
-	Prepare(ctx context.Context, inputs *input.PreflightData) (*input.ProverInput, error)
+	Prepare(ctx context.Context, inputs *PreflightData) (*input.ProverInput, error)
 }
 
 type preparer struct{}
@@ -39,7 +36,7 @@ func NewPreparer() Preparer {
 }
 
 // Prepare prepares the ProvableBlockInputs data for the EVM prover engine.
-func (p *preparer) Prepare(ctx context.Context, data *input.PreflightData) (*input.ProverInput, error) {
+func (p *preparer) Prepare(ctx context.Context, data *PreflightData) (*input.ProverInput, error) {
 	ctx = tag.WithComponent(ctx, "prepare")
 	ctx = tag.WithTags(
 		ctx,
@@ -65,7 +62,7 @@ type preparerContext struct {
 	hc       *core.HeaderChain
 }
 
-func (p *preparer) prepare(ctx context.Context, inputs *input.PreflightData) (*input.ProverInput, error) {
+func (p *preparer) prepare(ctx context.Context, inputs *PreflightData) (*input.ProverInput, error) {
 	log.LoggerFromContext(ctx).Info("Process provable inputs preparation...")
 
 	valCtx, err := p.prepareContext(ctx, inputs)
@@ -89,7 +86,7 @@ func (p *preparer) prepare(ctx context.Context, inputs *input.PreflightData) (*i
 	return p.prepareProverInput(valCtx, execParams), nil
 }
 
-func (p *preparer) prepareContext(ctx context.Context, inputs *input.PreflightData) (*preparerContext, error) {
+func (p *preparer) prepareContext(ctx context.Context, inputs *PreflightData) (*preparerContext, error) {
 	log.LoggerFromContext(ctx).Debug("Prepare context...")
 
 	// --- Create necessary database and chain instances ---
@@ -111,7 +108,7 @@ func (p *preparer) prepareContext(ctx context.Context, inputs *input.PreflightDa
 	}, nil
 }
 
-func (p *preparer) preparePreState(ctx *preparerContext, inputs *input.PreflightData) error {
+func (p *preparer) preparePreState(ctx *preparerContext, inputs *PreflightData) error {
 	log.LoggerFromContext(ctx.ctx).Info("Prepare pre-state...")
 
 	// -- Preload the ancestors of the block into database ---
@@ -141,7 +138,7 @@ func (p *preparer) preparePreState(ctx *preparerContext, inputs *input.Preflight
 	return nil
 }
 
-func (p *preparer) prepareExecParams(ctx *preparerContext, inputs *input.PreflightData) (*evm.ExecParams, error) {
+func (p *preparer) prepareExecParams(ctx *preparerContext, inputs *PreflightData) (*evm.ExecParams, error) {
 	log.LoggerFromContext(ctx.ctx).Debug("Prepare execution parameters...")
 
 	parentHeader := inputs.Ancestors[0]
@@ -171,33 +168,31 @@ func (p *preparer) execute(ctx *preparerContext, execParams *evm.ExecParams) err
 	return nil
 }
 
-func (p *preparer) prepareProverInput(ctx *preparerContext, execParams *evm.ExecParams) *input.ProverInput {
-	ProverInput := &input.ProverInput{
+func (p *preparer) prepareProverInput(_ *preparerContext, execParams *evm.ExecParams) *input.ProverInput {
+	proverInput := &input.ProverInput{
 		ChainConfig: execParams.Chain.Config(),
-		Block:       new(ethrpc.Block).FromBlock(execParams.Block, execParams.Chain.Config()),
-		Ancestors:   execParams.State.Witness().Headers,
+		Blocks: []*input.Block{
+			{
+				Header:       execParams.Block.Header(),
+				Transactions: execParams.Block.Transactions(),
+				Uncles:       execParams.Block.Uncles(),
+				Withdrawals:  execParams.Block.Withdrawals(),
+			},
+		},
+		Witness: &input.Witness{
+			Ancestors: execParams.State.Witness().Headers,
+		},
 	}
 
 	witness := execParams.State.Witness()
 	for code := range witness.Codes {
-		ProverInput.Codes = append(ProverInput.Codes, []byte(code))
+		proverInput.Witness.Codes = append(proverInput.Witness.Codes, []byte(code))
 	}
 
 	for node := range witness.State {
 		blob := []byte(node)
-		ProverInput.PreState = append(ProverInput.PreState, blob)
+		proverInput.Witness.State = append(proverInput.Witness.State, blob)
 	}
 
-	ProverInput.AccessList = make(map[gethcommon.Address][]hexutil.Bytes)
-	tracker := ctx.trackers.GetAccessTracker(ProverInput.Ancestors[0].Root)
-	for account := range tracker.Accounts {
-		if storage, ok := tracker.Storage[account]; ok {
-			ProverInput.AccessList[account] = []hexutil.Bytes{}
-			for slot := range storage {
-				ProverInput.AccessList[account] = append(ProverInput.AccessList[account], slot.Bytes())
-			}
-		}
-	}
-
-	return ProverInput
+	return proverInput
 }
