@@ -14,6 +14,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+//go:generate mockgen -destination=./mock/input_store.go -package=mockstore github.com/kkrt-labs/zk-pig/src/store ProverInputStore
+
+// ProverInputStore is a store for prover inputs.
 type ProverInputStore interface {
 	// StoreProverInput stores the prover inputs for a block.
 	StoreProverInput(ctx context.Context, inputs *input.ProverInput) error
@@ -68,19 +71,17 @@ func (s *proverInputStore) StoreProverInput(ctx context.Context, data *input.Pro
 		return fmt.Errorf("unsupported content type: %s", contentType)
 	}
 
-	path := s.proverPath(data.Blocks[0].Header.Number.Uint64())
+	path := s.proverPath(data.ChainConfig.ChainID.Uint64(), data.Blocks[0].Header.Number.Uint64())
 	headers := store.Headers{
 		ContentType: s.contentType,
-		KeyValue:    map[string]string{"chainID": fmt.Sprintf("%d", data.ChainConfig.ChainID.Uint64())},
 	}
 	return s.store.Store(ctx, path, bytes.NewReader(buf.Bytes()), &headers)
 }
 
 func (s *proverInputStore) LoadProverInput(ctx context.Context, chainID, blockNumber uint64) (*input.ProverInput, error) {
-	path := s.proverPath(blockNumber)
+	path := s.proverPath(chainID, blockNumber)
 	headers := store.Headers{
 		ContentType: s.contentType,
-		KeyValue:    map[string]string{"chainID": fmt.Sprintf("%d", chainID)},
 	}
 	reader, err := s.store.Load(ctx, path, &headers)
 	if err != nil {
@@ -115,6 +116,6 @@ func (s *proverInputStore) LoadProverInput(ctx context.Context, chainID, blockNu
 	return data, nil
 }
 
-func (s *proverInputStore) proverPath(blockNumber uint64) string {
-	return fmt.Sprintf("%d", blockNumber)
+func (s *proverInputStore) proverPath(chainID, blockNumber uint64) string {
+	return fmt.Sprintf("%d/%d", chainID, blockNumber)
 }
